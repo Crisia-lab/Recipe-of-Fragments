@@ -1,1 +1,195 @@
-index.html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Recipe of Fragments — Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg: #000;
+      --fg: #fff;
+      --accent: #ff3366;
+    }
+    html,body{height:100%; margin:0; background:var(--bg); color:var(--fg); font-family: "Courier New", Courier, monospace;}
+    .wrap{max-width:900px; margin:40px auto; padding:20px;}
+    h1{color:var(--accent); margin:0 0 20px 0; font-size:28px;}
+    .recipe{margin-bottom:60px; font-size:18px; line-height:1.7;}
+    .recipe h2{margin:6px 0 10px 0; color: #f080a8; font-size:20px;}
+    .glitch{
+      display:inline-block;
+      transition: color .18s ease, opacity .5s ease, transform .18s ease;
+      will-change: color, opacity, transform;
+    }
+    .erased{
+      opacity:0.06;
+      color: transparent !important;
+      text-shadow: none !important;
+      transform: translateY(4px);
+    }
+    .hint{color:#999; font-size:13px; margin-top:10px;}
+    footer{margin-top:40px; color:#777; font-size:13px;}
+    /* small responsive tweak */
+    @media (max-width:640px){
+      .wrap{padding:12px;}
+      .recipe{font-size:16px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Recipe of Fragments</h1>
+
+    <div class="recipe" id="r1">
+      <h2>Recipe — Salt & Water</h2>
+      1 cup <span class="glitch" data-key="salt">salt</span><br>
+      2 spoons <span class="glitch" data-key="rice">rice</span><br>
+      Stir until <span class="glitch" data-key="silence">silence</span>
+    </div>
+
+    <div class="recipe" id="r2">
+      <h2>Recipe — Pepper Memory</h2>
+      Handful of <span class="glitch" data-key="pepper">pepper</span><br>
+      Boil <span class="glitch" data-key="water">water</span> until it forgets<br>
+      Serve with <span class="glitch" data-key="memory">memory</span>
+    </div>
+
+    <div class="recipe" id="r3">
+      <h2>Recipe — Bread & Time</h2>
+      Break <span class="glitch" data-key="bread">bread</span> into <span class="glitch" data-key="pieces">pieces</span><br>
+      Add <span class="glitch" data-key="oil">oil</span> and <span class="glitch" data-key="time">time</span><br>
+      Swallow <span class="glitch" data-key="history">history</span>
+    </div>
+
+    <div class="hint">Tip: click any word to force it to mutate. Words sometimes disappear and reappear — this is intentional.</div>
+
+    <footer>Made for demo — you can edit these lines in GitHub to add your own recipes.</footer>
+  </div>
+
+  <script>
+    /***********************
+     * Recipe of Fragments
+     * Self-contained, no libraries.
+     ***********************/
+
+    // Pools of variations for keyed words (add more pairs here)
+    const pools = {
+      salt: ["salt","soil","silt","soul","s a l t"],
+      rice: ["rice","voice","vice","ice"],
+      silence: ["silence","absence","violence","science"],
+      pepper: ["pepper","paper","pebble","ember"],
+      water: ["water","waiter","winter","waste"],
+      memory: ["memory","remains","data","error"],
+      bread: ["bread","broke","breed","brand"],
+      pieces: ["pieces","pixels","fragments","ruins"],
+      oil: ["oil","soil","coil","null"],
+      time: ["time","tide","tile","term"],
+      history: ["history","story","mystery","misery"]
+    };
+
+    // helper: random choice
+    function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+    // small corruption for words not in pools
+    function scrambleWord(w){
+      if(!w) return w;
+      // 40% chance to shuffle characters, 30% chance to replace with '…', else random substring
+      const r = Math.random();
+      if(r < 0.4){
+        const a = w.split('');
+        for(let i=0;i<Math.floor(a.length/2);i++){
+          const i1 = Math.floor(Math.random()*a.length);
+          const i2 = Math.floor(Math.random()*a.length);
+          [a[i1], a[i2]] = [a[i2], a[i1]];
+        }
+        return a.join('');
+      } else if(r < 0.7){
+        return '…';
+      } else {
+        const start = Math.floor(Math.random()*w.length);
+        return w.slice(start, start + Math.max(1, Math.floor(w.length/2)));
+      }
+    }
+
+    // color glitch generator (subtle)
+    function randomColor(){
+      const hue = Math.floor(Math.random()*360);
+      return `hsl(${hue} 80% 70%)`;
+    }
+
+    // main mutation loop
+    const glitchSpans = Array.from(document.querySelectorAll('.glitch'));
+
+    // set data-original for fallback
+    glitchSpans.forEach(sp=>{
+      sp.dataset.orig = sp.textContent.trim();
+    });
+
+    // mutate one or all words periodically
+    function mutateAll(){
+      glitchSpans.forEach(sp=>{
+        // skip erased ones (we let erase handle reappearance)
+        if(sp.classList.contains('erased')) return;
+
+        // small chance no change
+        if(Math.random() < 0.25) return;
+
+        const key = sp.dataset.key;
+        if(key && pools[key]){
+          sp.textContent = choice(pools[key]);
+        } else {
+          sp.textContent = scrambleWord(sp.textContent);
+        }
+        sp.style.color = randomColor();
+        // quick jitter
+        sp.style.transform = `translateY(${(Math.random()*6-3).toFixed(2)}px)`;
+        setTimeout(()=> sp.style.transform = '', 180);
+      });
+    }
+
+    // erasing/decay routine: randomly remove a word, then restore it later
+    function randomErase(){
+      const candidates = glitchSpans.filter(s => !s.classList.contains('erased'));
+      if(!candidates.length) return;
+      const sp = choice(candidates);
+      sp.classList.add('erased');
+      // set very tiny content so layout doesn't collapse, but look gone
+      sp.dataset.saved = sp.textContent;
+      sp.textContent = '';
+      // schedule a restore after 4–12s (ephemeral)
+      const restoreAfter = 4000 + Math.floor(Math.random()*8000);
+      setTimeout(()=>{
+        sp.classList.remove('erased');
+        // restore to either original or a random mutation
+        const key = sp.dataset.key;
+        if(key && pools[key]){
+          sp.textContent = choice(pools[key]);
+        } else {
+          sp.textContent = sp.dataset.saved || sp.dataset.orig || '…';
+        }
+        sp.style.color = randomColor();
+      }, restoreAfter);
+    }
+
+    // trigger function every few seconds
+    setInterval(mutateAll, 1600);     // mutate many words often
+    setInterval(randomErase, 7000);   // occasionally erase one
+
+    // click to mutate immediately
+    glitchSpans.forEach(sp => {
+      sp.style.cursor = 'pointer';
+      sp.addEventListener('click', ()=>{
+        // immediate mutation + small audio-ish effect with visual change
+        if(sp.classList.contains('erased')) return;
+        const key = sp.dataset.key;
+        if(key && pools[key]) sp.textContent = choice(pools[key]);
+        else sp.textContent = scrambleWord(sp.textContent);
+        sp.style.color = randomColor();
+        sp.style.transform = 'translateY(-6px)';
+        setTimeout(()=> sp.style.transform = '', 140);
+      });
+    });
+
+    // lightweight accessibility: if JS disabled, nothing breaks — the static text remains visible.
+  </script>
+</body>
+</html>
